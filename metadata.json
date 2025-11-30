@@ -1,0 +1,5 @@
+{
+  "name": "Temporal Data Viewer",
+  "description": "An interactive web application to visualize 3D temporal data. Load a dataset and explore 2D image slices over time using a slider and configurable colormaps.",
+  "requestFramePermissions": []
+}
