@@ -94,7 +94,8 @@ export class WebGLTextureManager {
       // This is a temporary CPU-side conversion, but the cache still holds Int16, saving RAM.
       const floatData = new Float32Array(data);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.LUMINANCE, width, height, 0, gl.LUMINANCE, gl.FLOAT, floatData);
-    } else if (data instanceof Uint32Array) {
+    }
+    else if (data instanceof Uint32Array) {
       // Should not happen with current logic (we use Uint8 for bitpacking), but just in case
       const floatData = new Float32Array(data);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.LUMINANCE, width, height, 0, gl.LUMINANCE, gl.FLOAT, floatData);

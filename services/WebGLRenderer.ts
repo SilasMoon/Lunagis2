@@ -301,7 +301,7 @@ export class WebGLRenderer {
   /**
    * Add a layer to the renderer
    */
-  addLayer(layer: RenderableLayer, timeIndex: number = 0): WebGLLayerHandle {
+  addLayer(layer: RenderableLayer, timeIndex: number = 0, onUpdate?: () => void): WebGLLayerHandle {
     const { dimensions, range, colormap, opacity } = layer;
 
     // Determine if bit-packed
@@ -399,6 +399,9 @@ export class WebGLRenderer {
           if (!isBitPacked) {
             (currentHandle as any).isUint8 = (resolvedData instanceof Uint8Array);
           }
+
+          // Trigger callback
+          if (onUpdate) onUpdate();
         }
       }).catch(err => {
         console.error(`Failed to load initial data for layer ${layer.id}:`, err);
@@ -411,9 +414,9 @@ export class WebGLRenderer {
   }
 
   /**
-   * Update layer to a different time index
+   * Update a layer's time index (and texture)
    */
-  updateLayerTime(layerId: string, layer: RenderableLayer, timeIndex: number): void {
+  updateLayerTime(layerId: string, layer: RenderableLayer, timeIndex: number, onUpdate?: () => void): void {
     const handle = this.layers.get(layerId);
     if (!handle) {
       console.warn(`Layer ${layerId} not found in WebGL renderer`);
@@ -423,46 +426,45 @@ export class WebGLRenderer {
     // Update time index immediately to track latest request
     handle.currentTimeIndex = timeIndex;
 
-    // Determine if bit-packed
-    let isBitPacked = (handle as any).isBitPacked;
-    const textureWidth = isBitPacked ? Math.ceil(handle.width / 8) : handle.width;
-
-    // Get new data
+    // If layer has lazy dataset, load the new slice
     if ('lazyDataset' in layer && layer.lazyDataset) {
-      // Try synchronous cache first
-      const cached = layer.lazyDataset.getCachedSlice(timeIndex);
+      // Check if data is already in cache (synchronous check if possible, but getSlice is async)
+      // We'll just call getSlice, which handles caching.
 
-      if (cached) {
-        // Synchronous update
-        this.textureManager.updateTexture(handle.texture, textureWidth, handle.height, cached);
-        if (!isBitPacked) (handle as any).isUint8 = (cached instanceof Uint8Array);
-      } else {
-        // Async load
-        const result = layer.lazyDataset.getSlice(timeIndex);
+      // Optimization: if we already have a pending promise for this time, we could reuse it.
+      // For now, just request it.
+      layer.lazyDataset.getSlice(timeIndex).then((data) => {
+        // Check if we still need this time index (user might have scrolled past)
+        const current = this.layers.get(layerId)?.currentTimeIndex;
 
-        // Handle async loading with race condition check
-        result.then((data) => {
-          // Check if this is still the requested time index
-          const current = this.layers.get(layerId)?.currentTimeIndex;
-          console.log(`[WebGLRenderer] Async slice loaded for ${layerId} at time ${timeIndex}. Current time: ${current}`);
-
-          if (current === timeIndex) {
-            this.textureManager.updateTexture(handle.texture, textureWidth, handle.height, data);
-            if (!isBitPacked) (handle as any).isUint8 = (data instanceof Uint8Array);
-            console.log(`[WebGLRenderer] Texture updated for ${layerId} at time ${timeIndex}`);
-          } else {
-            console.warn(`[WebGLRenderer] Discarding stale slice for ${layerId} (loaded: ${timeIndex}, needed: ${current})`);
+        if (current === timeIndex) {
+          const { dimensions } = layer;
+          let isBitPacked = false;
+          if (layer.type === 'illumination' && layer.metadata?.variableName) {
+            isBitPacked = ['dte_visibility', 'night_flag'].includes(layer.metadata.variableName);
           }
-        }).catch(err => {
-          console.error(`Failed to update layer ${layerId} time:`, err);
-        });
-      }
+          const textureWidth = isBitPacked ? Math.ceil(dimensions.width / 8) : dimensions.width;
+
+          this.textureManager.updateTexture(handle.texture, textureWidth, handle.height, data);
+          if (!isBitPacked) (handle as any).isUint8 = (data instanceof Uint8Array);
+          console.log(`[WebGLRenderer] Texture updated for ${layerId} at time ${timeIndex}. Data sample:`, data.slice(0, 5));
+
+          // Trigger callback to request re-render
+          if (onUpdate) onUpdate();
+        } else {
+          console.warn(`[WebGLRenderer] Discarding stale slice for ${layerId} (loaded: ${timeIndex}, needed: ${current})`);
+        }
+      }).catch(error => {
+        console.error(`[WebGLRenderer] Failed to load slice for ${layerId} at time ${timeIndex}:`, error);
+      });
     } else {
-      // Handle non-lazy datasets (legacy path)
+      // Synchronous update for in-memory datasets
       const slice2D = layer.dataset[timeIndex];
-      const data = new Float32Array(slice2D.flat());
-      this.textureManager.updateTexture(handle.texture, textureWidth, handle.height, data);
-      if (!isBitPacked) (handle as any).isUint8 = false;
+      if (slice2D) {
+        const data = new Float32Array(slice2D.flat());
+        this.textureManager.updateTexture(handle.texture, handle.width, handle.height, data);
+        if (onUpdate) onUpdate();
+      }
     }
   }
 
