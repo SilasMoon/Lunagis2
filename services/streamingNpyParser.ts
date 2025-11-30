@@ -172,6 +172,8 @@ export async function loadNpyTimeSlice(
     metadata.bytesPerValue
   );
 
+  console.log(`[StreamingNpyParser] Loading slice ${timeIndex}: offset=${offset}, size=${size}`);
+
   if (onProgress) {
     onProgress({
       phase: 'data',

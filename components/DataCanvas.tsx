@@ -545,6 +545,8 @@ export const DataCanvas: React.FC = () => {
   const [hoveredWaypointInfo, setHoveredWaypointInfo] = useState<{ artifactId: string; waypointId: string } | null>(null);
   const [rectangleFirstCorner, setRectangleFirstCorner] = useState<[number, number] | null>(null);
   const [currentMouseProjCoords, setCurrentMouseProjCoords] = useState<[number, number] | null>(null);
+  // Track data version to trigger re-renders when async data loads
+  const [dataVersion, setDataVersion] = useState(0);
 
   // Delete artifact handler
   const onDeleteArtifact = useCallback((artifactId: string) => {
@@ -689,6 +691,26 @@ export const DataCanvas: React.FC = () => {
       }
     });
   }, [layers]);
+
+  // Update WebGL layer time when currentDateIndex changes
+  useEffect(() => {
+    if (!USE_WEBGL_RENDERER || !webglRendererRef.current) return;
+
+    const renderer = webglRendererRef.current;
+    const timeIndex = currentDateIndex ?? 0;
+
+    layers.forEach(layer => {
+      if (layer.visible && isDataGridLayer(layer)) {
+        // Update time index
+        const actualTimeIndex = getLayerTimeIndex(layer, timeIndex);
+        console.log(`[DataCanvas] Updating layer ${layer.id} to time index ${actualTimeIndex} (global: ${timeIndex})`);
+        renderer.updateLayerTime(layer.id, layer, actualTimeIndex, () => {
+          // Trigger re-render when texture is ready
+          setDataVersion(v => v + 1);
+        });
+      }
+    });
+  }, [currentDateIndex, layers]);
 
   const canvasToProjCoords = useCallback((canvasX: number, canvasY: number): [number, number] | null => {
     const canvas = graticuleCanvasRef.current;
@@ -929,7 +951,7 @@ export const DataCanvas: React.FC = () => {
           // Handle lazy loading or traditional dataset
           const actualTimeIndex = getLayerTimeIndex(layer, timeIndex);
           let slice: number[][] | undefined;
-          let flatSlice: Float32Array | undefined;
+          let flatSlice: Float32Array | Uint8Array | Int16Array | Uint32Array | undefined;
 
           if ('lazyDataset' in layer && layer.lazyDataset) {
             // Lazy loading: check cache first
@@ -940,8 +962,8 @@ export const DataCanvas: React.FC = () => {
               layer.lazyDataset.getSlice(actualTimeIndex).then(() => {
                 // Data is now in cache, invalidate canvas cache to trigger re-render
                 offscreenCanvasCache.delete(cacheKey);
-                // Force re-render (hacky but needed if state doesn't change)
-                setIsRendering(prev => !prev);
+                // Trigger re-render by updating data version
+                setDataVersion(v => v + 1);
               }).catch(err => {
                 if (err.message && err.message.includes('cancelled')) {
                   // Ignore cancelled requests (due to debouncing)
@@ -1305,7 +1327,9 @@ export const DataCanvas: React.FC = () => {
           if (!oldState) {
             // New layer - add it
             console.log(`✨ Adding WebGL layer: ${layer.name}`);
-            renderer.addLayer(layer, layerTimeIndex);
+            renderer.addLayer(layer, layerTimeIndex, () => {
+              setDataVersion(v => v + 1);
+            });
           } else if (oldState.timeIndex !== layerTimeIndex) {
             // Time index changed - update texture
             console.log(`🔄 Updating WebGL layer time: ${layer.name} (t=${layerTimeIndex})`);
@@ -1337,7 +1361,7 @@ export const DataCanvas: React.FC = () => {
 
     contexts.forEach(ctx => ctx.restore());
     if (performance.now() - renderStartTime > 16) requestAnimationFrame(() => setIsRendering(false)); else setIsRendering(false);
-  }, [layers, timeIndex, showGraticule, proj, viewState, isDataLoaded, latRange, lonRange, canvasToProjCoords, debouncedTimeRange, debouncedShowGrid, debouncedGridSpacing, gridColor, graticuleLinesCache, graticuleLabelFontSize]);
+  }, [layers, timeIndex, showGraticule, proj, viewState, isDataLoaded, latRange, lonRange, canvasToProjCoords, debouncedTimeRange, debouncedShowGrid, debouncedGridSpacing, gridColor, graticuleLinesCache, graticuleLabelFontSize, dataVersion]);
 
   // Helper function to get the 4 corners of a rectangle artifact in projected coordinates
   const getRectangleCorners = useCallback((artifact: RectangleArtifact): [number, number][] | null => {

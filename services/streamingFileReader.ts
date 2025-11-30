@@ -81,9 +81,9 @@ export function calculateRegionOffset(
 
   // For C-order, we can read contiguous rows
   const firstRowOffset = headerSize +
-                         timeIndex * sliceSize +
-                         yStart * rowSize +
-                         xStart * bytesPerValue;
+    timeIndex * sliceSize +
+    yStart * rowSize +
+    xStart * bytesPerValue;
 
   const numRows = yEnd - yStart;
   const size = numRows * rowSize;

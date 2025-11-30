@@ -15,7 +15,7 @@ export interface ILazyDataset {
   setProgressCallback?(callback: (progress: { message: string }) => void): void;
 }
 
-const SLICE_CACHE_SIZE_MB = 256; // Max cache size in MB
+const SLICE_CACHE_SIZE_MB = 1024; // Max cache size in MB (increased for full dataset caching)
 
 class SliceCache {
   private cache = new Map<string, { data: SliceData; lastAccess: number }>();
@@ -153,19 +153,65 @@ export class NetCDFLazyDataset implements ILazyDataset {
     // Yield before heavy lifting to let UI breathe
     await yieldToMain();
 
-    const [_, height, width] = this.dataset.shape;
+    const [timeSteps, height, width] = this.dataset.shape;
     const start = [timeIndex, 0, 0];
     const count = [1, height, width];
 
     // Read data directly
-    const rawData = (this.dataset as any).slice(start, count);
+    let rawData = (this.dataset as any).slice(start, count);
+
+    // Check if we got the full 3D volume instead of 1 slice (h5wasm bug/feature)
+    const expectedLength = height * width;
+
+    if (rawData.length > expectedLength) {
+      console.log(`[NetCDFLazyDataset] Full dataset returned (${rawData.length}). Caching all ${timeSteps} slices.`);
+
+      const sliceSize = height * width;
+
+      // Process and cache ALL slices
+      for (let t = 0; t < timeSteps; t++) {
+        const offset = t * sliceSize;
+        let slice: any;
+
+        if (rawData.subarray) {
+          slice = rawData.subarray(offset, offset + sliceSize);
+        } else {
+          slice = rawData.slice(offset, offset + sliceSize);
+        }
+
+        // Apply quantization/conversion
+        let processedSlice: SliceData;
+
+        if (this.dataVarName === 'illumination' || this.dataVarName === 'orbiter_visibility') {
+          processedSlice = (slice instanceof Uint8Array) ? slice : new Uint8Array(slice);
+        } else if (this.dataVarName === 'dte_visibility' || this.dataVarName === 'night_flag') {
+          const input = (slice instanceof Float32Array || slice instanceof Int8Array || slice instanceof Uint8Array)
+            ? slice
+            : new Float32Array(slice);
+          processedSlice = packBinaryData(input as any);
+        } else if (this.dataVarName === 'darkness_duration') {
+          processedSlice = (slice instanceof Int16Array) ? slice : new Int16Array(slice);
+        } else {
+          processedSlice = (slice instanceof Float32Array) ? slice : new Float32Array(slice);
+        }
+
+        // Cache every slice
+        globalSliceCache.set(this.filename, t, processedSlice);
+
+        // Yield occasionally to keep UI responsive during bulk processing
+        if (t % 10 === 0) await yieldToMain();
+      }
+
+      // Return the requested slice from cache
+      return globalSliceCache.get(this.filename, timeIndex)!;
+    }
 
     // Yield again after reading, before processing
     await yieldToMain();
 
     let resultData: SliceData;
 
-    // Apply Quantization Rules
+    // Apply Quantization Rules (Single Slice Fallback)
     if (this.dataVarName === 'illumination' || this.dataVarName === 'orbiter_visibility') {
       // Rule 1: Uint8
       if (rawData instanceof Uint8Array) {
@@ -209,31 +255,72 @@ export class NetCDFLazyDataset implements ILazyDataset {
     // Yield before starting
     await yieldToMain();
 
-    const timeSteps = this.dataset.shape[0];
+    const [timeSteps, height, width] = this.dataset.shape;
+    const offset = y * width + x;
+    const result = new Array(timeSteps);
+    let missingCount = 0;
+
+    // Try to fill from cache first
+    for (let t = 0; t < timeSteps; t++) {
+      const slice = globalSliceCache.get(this.filename, t);
+      if (slice) {
+        result[t] = slice[offset];
+      } else {
+        missingCount++;
+      }
+    }
+
+    // If we found everything in cache, return immediately
+    if (missingCount === 0) {
+      return result;
+    }
+
+    // If we're missing data, fall back to reading from file
+    // Note: If the file was fully cached, we shouldn't reach here.
+    // If we do reach here, it means we have a mix or no cache.
+
     const start = [0, y, x];
     const count = [timeSteps, 1, 1];
 
     const rawData = (this.dataset as any).slice(start, count);
 
     // Handle the "full dataset returned" bug check here too
-    let result: number[];
+    // If h5wasm returns the full 3D array instead of the column
+    if (rawData.length > timeSteps) {
+      // If we got the full dataset, we might as well cache it all if we haven't already
+      // But this is a heavy operation. For now, just extract the column we need.
+      // (The getSlice method handles the bulk caching)
+
+      const sliceSize = height * width;
+      // Re-populate result from the raw full dataset
+      for (let t = 0; t < timeSteps; t++) {
+        result[t] = rawData[t * sliceSize + offset];
+      }
+      return result;
+    }
 
     if (rawData.length === timeSteps) {
-      result = Array.from(rawData);
+      // Correctly returned the column
+      // Fill in the missing spots in our result (or just overwrite)
+      for (let t = 0; t < timeSteps; t++) {
+        // If we didn't have it in cache, use the file data
+        if (result[t] === undefined) {
+          result[t] = rawData[t];
+        }
+      }
+      return result;
     } else {
-      // Fallback logic
-      const [_, height, width] = this.dataset.shape;
+      // Fallback logic for unexpected shapes
       const stride = height * width;
-      const offset = y * width + x;
 
       if (rawData.length === timeSteps * stride) {
-        result = new Array(timeSteps);
+        // It returned a full volume? (Handled above, but just in case logic differs)
         for (let t = 0; t < timeSteps; t++) {
           result[t] = rawData[t * stride + offset];
         }
       } else {
         // Try simple conversion
-        result = Array.from(rawData);
+        return Array.from(rawData);
       }
     }
     return result;
@@ -286,8 +373,10 @@ export class NpyLazyDataset implements ILazyDataset {
     // Check cache
     const cached = globalSliceCache.get(this.fileId, timeIndex);
     if (cached) {
+      console.log(`[LazyDataset] Cache hit for ${this.fileId} at time ${timeIndex}`);
       return cached;
     }
+    console.log(`[LazyDataset] Cache miss for ${this.fileId} at time ${timeIndex}`);
 
     // Yield before loading
     await yieldToMain();
