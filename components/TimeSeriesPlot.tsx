@@ -5,7 +5,10 @@ import { scaleUtc, scaleLinear } from 'd3-scale';
 import { axisBottom, axisLeft } from 'd3-axis';
 import { line } from 'd3-shape';
 import type { TimeRange, TimeDomain, ColorStop, Layer } from '../types';
-import { useAppContext } from '../context/AppContext';
+import { useLayerContext } from '../context/LayerContext';
+import { useSelectionContext } from '../context/SelectionContext';
+import { useTimeContext } from '../context/TimeContext';
+import { useUIStateContext } from '../context/UIStateContext';
 import { MAX_TIME_SERIES_POINTS } from '../config/defaults';
 
 interface TimeSeriesPlotProps {
@@ -16,19 +19,18 @@ interface TimeSeriesPlotProps {
 export const MARGIN = { top: 10, right: 30, bottom: 20, left: 50 };
 
 export const TimeSeriesPlot: React.FC<TimeSeriesPlotProps> = () => {
+  const { primaryDataLayer, activeLayer } = useLayerContext();
+  const { timeSeriesData } = useSelectionContext();
   const {
-    primaryDataLayer,
-    timeSeriesData,
     timeRange,
     currentDateIndex,
     fullTimeDomain,
     timeZoomDomain,
     getDateForIndex,
     onZoomToSelection,
-    onResetZoom,
-    activeLayer,
-    nightfallPlotYAxisRange
-  } = useAppContext();
+    onResetZoom
+  } = useTimeContext();
+  const { nightfallPlotYAxisRange } = useUIStateContext();
 
   const isDataLoaded = !!primaryDataLayer;
   const dataRange = timeSeriesData?.range ?? null;

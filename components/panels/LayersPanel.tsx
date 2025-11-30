@@ -4,7 +4,9 @@ import { COLOR_MAPS } from '../../types';
 import { Colorbar } from '../Colorbar';
 import { DivergingThresholdEditor } from '../DivergingThresholdEditor';
 import { sanitizeLayerNameForExpression } from '../../services/analysisService';
-import { useAppContext } from '../../context/AppContext';
+import { useLayerContext } from '../../context/LayerContext';
+import { useUIStateContext } from '../../context/UIStateContext';
+import { useSelectionContext } from '../../context/SelectionContext';
 import { Section, formatDuration } from './panelUtils';
 import { hasColormap, isNightfallLayer, isExpressionLayer, isAnalysisLayer, isImageLayer, isDaylightFractionLayer, isDataLayer, isIlluminationLayer } from '../../utils/layerHelpers';
 import { color as d3Color } from 'd3-color';
@@ -68,7 +70,7 @@ const CustomColormapEditor: React.FC<{
         onStopsChange(newStops);
     };
 
-    const handleUpdateStop = (index: number, updatedProp: Partial<ColorStop & {alpha: number}>) => {
+    const handleUpdateStop = (index: number, updatedProp: Partial<ColorStop & { alpha: number }>) => {
         const newStops = [...stops];
         const currentStop = newStops[index];
 
@@ -115,7 +117,7 @@ const CustomColormapEditor: React.FC<{
                                 readOnly={isFirstStop}
                                 onBlur={isFirstStop ? undefined : (e) => {
                                     let val = parseFloat(e.target.value);
-                                    if(isNaN(val)) return;
+                                    if (isNaN(val)) return;
                                     handleUpdateStop(index, { value: val });
                                 }}
                                 className="w-full bg-gray-700 text-white text-sm rounded-md p-1 border border-gray-600 disabled:bg-gray-800 disabled:text-gray-500"
@@ -148,8 +150,8 @@ const CustomColormapEditor: React.FC<{
                     );
                 })}
             </div>
-             <div className="border-t border-gray-600 pt-3 grid grid-cols-[20px_1fr_auto_auto_auto] items-center gap-2">
-                <span/>
+            <div className="border-t border-gray-600 pt-3 grid grid-cols-[20px_1fr_auto_auto_auto] items-center gap-2">
+                <span />
                 <input
                     type="number"
                     step={units === 'days' ? 0.1 : 1}
@@ -205,13 +207,13 @@ const LayerItem = React.memo<{ layer: Layer; isActive: boolean; onSelect: () => 
         onMoveLayerDown,
         onCalculateNightfallLayer,
         onCalculateDaylightFractionLayer,
-        daylightFractionHoverData,
-        flickeringLayerId,
-        onToggleFlicker,
         layers,
         onRecalculateExpressionLayer,
         isLoading
-    } = useAppContext();
+    } = useLayerContext();
+
+    const { flickeringLayerId, onToggleFlicker } = useUIStateContext();
+    const { daylightFractionHoverData } = useSelectionContext();
 
     const [editingExpression, setEditingExpression] = useState(false);
     const [newExpression, setNewExpression] = useState('');
@@ -263,15 +265,15 @@ const LayerItem = React.memo<{ layer: Layer; isActive: boolean; onSelect: () => 
                     <p className="font-medium text-gray-200" title={layer.name}>{layer.name}</p>
                     <p className="text-xs text-gray-400">{formatLayerType(layer.type)}</p>
                     {isExpressionLayer(layer) && layer.params.expression && (
-                      <p className="text-xs text-gray-500 font-mono truncate mt-1" title={layer.params.expression}>
-                        Expr: {layer.params.expression}
-                      </p>
+                        <p className="text-xs text-gray-500 font-mono truncate mt-1" title={layer.params.expression}>
+                            Expr: {layer.params.expression}
+                        </p>
                     )}
                 </div>
                 <button onClick={onSelect} className="text-gray-400 hover:text-white">
                     <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 transition-transform ${isActive ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
                 </button>
-                 <button onClick={() => onRemoveLayer(layer.id)} title="Remove Layer" className="text-gray-500 hover:text-red-400"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg></button>
+                <button onClick={() => onRemoveLayer(layer.id)} title="Remove Layer" className="text-gray-500 hover:text-red-400"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg></button>
             </div>
             {isActive && (
                 <div className="p-3 border-t border-gray-700 space-y-4 animate-fade-in">
@@ -634,132 +636,132 @@ const LayerItem = React.memo<{ layer: Layer; isActive: boolean; onSelect: () => 
                     )}
                     {layerHasColormap && (
                         <>
-                          <div>
-                            <label className="block text-xs font-medium text-gray-400 mb-1">Colormap</label>
-                            <div className="flex items-center gap-2">
-                                <select value={layer.colormap} onChange={(e) => onUpdateLayer(layer.id, { colormap: e.target.value as ColorMapName })} className="flex-grow bg-gray-700 border border-gray-600 text-white text-xs rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block p-2.5">
-                                  {COLOR_MAPS.map(name => (<option key={name} value={name}>{name}</option>))}
-                                </select>
-                                <label className="flex items-center gap-1.5 text-xs text-gray-400 cursor-pointer whitespace-nowrap">
-                                    <input
-                                        type="checkbox"
-                                        checked={!!layer.colormapInverted}
-                                        onChange={(e) => onUpdateLayer(layer.id, { colormapInverted: e.target.checked })}
-                                        className="w-4 h-4 text-cyan-600 bg-gray-700 border-gray-600 rounded focus:ring-cyan-500"
-                                    />
-                                    Invert
-                                </label>
+                            <div>
+                                <label className="block text-xs font-medium text-gray-400 mb-1">Colormap</label>
+                                <div className="flex items-center gap-2">
+                                    <select value={layer.colormap} onChange={(e) => onUpdateLayer(layer.id, { colormap: e.target.value as ColorMapName })} className="flex-grow bg-gray-700 border border-gray-600 text-white text-xs rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block p-2.5">
+                                        {COLOR_MAPS.map(name => (<option key={name} value={name}>{name}</option>))}
+                                    </select>
+                                    <label className="flex items-center gap-1.5 text-xs text-gray-400 cursor-pointer whitespace-nowrap">
+                                        <input
+                                            type="checkbox"
+                                            checked={!!layer.colormapInverted}
+                                            onChange={(e) => onUpdateLayer(layer.id, { colormapInverted: e.target.checked })}
+                                            className="w-4 h-4 text-cyan-600 bg-gray-700 border-gray-600 rounded focus:ring-cyan-500"
+                                        />
+                                        Invert
+                                    </label>
+                                </div>
                             </div>
-                          </div>
-                           {layer.colormap === 'DivergingThreshold' && (
-                               <DivergingThresholdEditor
-                                   config={layer.divergingThresholdConfig || getDefaultDivergingConfig(layer.range)}
-                                   onChange={(config) => onUpdateLayer(layer.id, { divergingThresholdConfig: config })}
-                                   layerRange={layer.range}
-                               />
-                           )}
-                           {layer.colormap === 'Custom' && (
-                               <CustomColormapEditor
-                                   layerRange={layer.range}
-                                   stops={
-                                    (layer.customColormap || []).map(s => ({
-                                        ...s,
-                                        value: useDaysUnitForCustom ? s.value / 24 : s.value
-                                    }))
-                                   }
-                                   onStopsChange={(stops) => {
-                                      const stopsInHours = stops.map(s => ({
-                                          ...s,
-                                          value: useDaysUnitForCustom ? s.value * 24 : s.value
+                            {layer.colormap === 'DivergingThreshold' && (
+                                <DivergingThresholdEditor
+                                    config={layer.divergingThresholdConfig || getDefaultDivergingConfig(layer.range)}
+                                    onChange={(config) => onUpdateLayer(layer.id, { divergingThresholdConfig: config })}
+                                    layerRange={layer.range}
+                                />
+                            )}
+                            {layer.colormap === 'Custom' && (
+                                <CustomColormapEditor
+                                    layerRange={layer.range}
+                                    stops={
+                                        (layer.customColormap || []).map(s => ({
+                                            ...s,
+                                            value: useDaysUnitForCustom ? s.value / 24 : s.value
+                                        }))
+                                    }
+                                    onStopsChange={(stops) => {
+                                        const stopsInHours = stops.map(s => ({
+                                            ...s,
+                                            value: useDaysUnitForCustom ? s.value * 24 : s.value
                                         }));
-                                      onUpdateLayer(layer.id, { customColormap: stopsInHours });
-                                   }}
-                                   units={useDaysUnitForCustom ? 'days' : undefined}
-                               />
-                           )}
-                           {layer.colormap !== 'Custom' && (
-                               <div className="space-y-2 p-3 bg-gray-900/30 rounded-md">
-                                   <h4 className="text-xs font-medium text-gray-300">Transparency Thresholds</h4>
-                                   <div className="space-y-2">
-                                       <div>
-                                           <label className="block text-xs text-gray-400 mb-1">Lower ≤</label>
-                                           <div className="flex items-center gap-1.5">
-                                               <input
-                                                   type="number"
-                                                   step="any"
-                                                   value={layer.transparencyLowerThreshold ?? ''}
-                                                   onChange={(e) => {
-                                                       const val = e.target.value === '' ? undefined : Number(e.target.value);
-                                                       onUpdateLayer(layer.id, { transparencyLowerThreshold: val });
-                                                   }}
-                                                   placeholder="None"
-                                                   className="flex-1 bg-gray-700 text-white text-sm rounded-md px-2 py-1.5 border border-gray-600"
-                                               />
-                                               {layer.transparencyLowerThreshold !== undefined && (
-                                                   <button
-                                                       onClick={() => onUpdateLayer(layer.id, { transparencyLowerThreshold: undefined })}
-                                                       className="text-gray-400 hover:text-red-400 flex-shrink-0"
-                                                       title="Clear"
-                                                   >
-                                                       <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                                           <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                                                       </svg>
-                                                   </button>
-                                               )}
-                                           </div>
-                                       </div>
-                                       <div>
-                                           <label className="block text-xs text-gray-400 mb-1">Upper ≥</label>
-                                           <div className="flex items-center gap-1.5">
-                                               <input
-                                                   type="number"
-                                                   step="any"
-                                                   value={layer.transparencyUpperThreshold ?? ''}
-                                                   onChange={(e) => {
-                                                       const val = e.target.value === '' ? undefined : Number(e.target.value);
-                                                       onUpdateLayer(layer.id, { transparencyUpperThreshold: val });
-                                                   }}
-                                                   placeholder="None"
-                                                   className="flex-1 bg-gray-700 text-white text-sm rounded-md px-2 py-1.5 border border-gray-600"
-                                               />
-                                               {layer.transparencyUpperThreshold !== undefined && (
-                                                   <button
-                                                       onClick={() => onUpdateLayer(layer.id, { transparencyUpperThreshold: undefined })}
-                                                       className="text-gray-400 hover:text-red-400 flex-shrink-0"
-                                                       title="Clear"
-                                                   >
-                                                       <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                                           <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                                                       </svg>
-                                                   </button>
-                                               )}
-                                           </div>
-                                       </div>
-                                       <p className="text-xs text-gray-500 italic">Values at or beyond thresholds become transparent</p>
-                                   </div>
-                               </div>
-                           )}
-                          <div className="flex flex-col items-center">
-                            <Colorbar
-                                colorMap={layer.colormap}
-                                customColormap={layer.customColormap}
-                                dataRange={
-                                    isNightfall
-                                    ? { min: -(layer.params.clipValue ?? 0), max: layer.params.clipValue ?? 0 }
-                                    : layer.range
-                                }
-                                units={
-                                    isAnalysisLayer(layer)
-                                        ? (isNightfallLayer(layer)
-                                            ? 'days'
-                                            : '%')
-                                        : undefined
-                                }
-                                inverted={layer.colormapInverted}
-                                isThreshold={layer.colormap === 'Custom'}
-                                divergingThresholdConfig={layer.divergingThresholdConfig}
-                            />
-                          </div>
+                                        onUpdateLayer(layer.id, { customColormap: stopsInHours });
+                                    }}
+                                    units={useDaysUnitForCustom ? 'days' : undefined}
+                                />
+                            )}
+                            {layer.colormap !== 'Custom' && (
+                                <div className="space-y-2 p-3 bg-gray-900/30 rounded-md">
+                                    <h4 className="text-xs font-medium text-gray-300">Transparency Thresholds</h4>
+                                    <div className="space-y-2">
+                                        <div>
+                                            <label className="block text-xs text-gray-400 mb-1">Lower ≤</label>
+                                            <div className="flex items-center gap-1.5">
+                                                <input
+                                                    type="number"
+                                                    step="any"
+                                                    value={layer.transparencyLowerThreshold ?? ''}
+                                                    onChange={(e) => {
+                                                        const val = e.target.value === '' ? undefined : Number(e.target.value);
+                                                        onUpdateLayer(layer.id, { transparencyLowerThreshold: val });
+                                                    }}
+                                                    placeholder="None"
+                                                    className="flex-1 bg-gray-700 text-white text-sm rounded-md px-2 py-1.5 border border-gray-600"
+                                                />
+                                                {layer.transparencyLowerThreshold !== undefined && (
+                                                    <button
+                                                        onClick={() => onUpdateLayer(layer.id, { transparencyLowerThreshold: undefined })}
+                                                        className="text-gray-400 hover:text-red-400 flex-shrink-0"
+                                                        title="Clear"
+                                                    >
+                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                                            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                                        </svg>
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs text-gray-400 mb-1">Upper ≥</label>
+                                            <div className="flex items-center gap-1.5">
+                                                <input
+                                                    type="number"
+                                                    step="any"
+                                                    value={layer.transparencyUpperThreshold ?? ''}
+                                                    onChange={(e) => {
+                                                        const val = e.target.value === '' ? undefined : Number(e.target.value);
+                                                        onUpdateLayer(layer.id, { transparencyUpperThreshold: val });
+                                                    }}
+                                                    placeholder="None"
+                                                    className="flex-1 bg-gray-700 text-white text-sm rounded-md px-2 py-1.5 border border-gray-600"
+                                                />
+                                                {layer.transparencyUpperThreshold !== undefined && (
+                                                    <button
+                                                        onClick={() => onUpdateLayer(layer.id, { transparencyUpperThreshold: undefined })}
+                                                        className="text-gray-400 hover:text-red-400 flex-shrink-0"
+                                                        title="Clear"
+                                                    >
+                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                                            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                                        </svg>
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <p className="text-xs text-gray-500 italic">Values at or beyond thresholds become transparent</p>
+                                    </div>
+                                </div>
+                            )}
+                            <div className="flex flex-col items-center">
+                                <Colorbar
+                                    colorMap={layer.colormap}
+                                    customColormap={layer.customColormap}
+                                    dataRange={
+                                        isNightfall
+                                            ? { min: -(layer.params.clipValue ?? 0), max: layer.params.clipValue ?? 0 }
+                                            : layer.range
+                                    }
+                                    units={
+                                        isAnalysisLayer(layer)
+                                            ? (isNightfallLayer(layer)
+                                                ? 'days'
+                                                : '%')
+                                            : undefined
+                                    }
+                                    inverted={layer.colormapInverted}
+                                    isThreshold={layer.colormap === 'Custom'}
+                                    divergingThresholdConfig={layer.divergingThresholdConfig}
+                                />
+                            </div>
                         </>
                     )}
                     {isDaylightFractionLayer(layer) && daylightFractionHoverData && (
@@ -773,7 +775,7 @@ const LayerItem = React.memo<{ layer: Layer; isActive: boolean; onSelect: () => 
                                 <span className="text-gray-300">Total Daylight:</span>
                                 <span className="font-mono text-cyan-300">{formatDuration(daylightFractionHoverData.dayHours)}</span>
                             </div>
-                             <div className="flex justify-between">
+                            <div className="flex justify-between">
                                 <span className="text-gray-300">Total Night:</span>
                                 <span className="font-mono text-cyan-300">{formatDuration(daylightFractionHoverData.nightHours)}</span>
                             </div>
@@ -794,12 +796,12 @@ const LayerItem = React.memo<{ layer: Layer; isActive: boolean; onSelect: () => 
                     )}
                     {isDataLayer(layer) && (
                         <div className="border-t border-gray-700 pt-3 space-y-2">
-                           <button onClick={() => onCalculateNightfallLayer(layer.id)} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-2 px-3 rounded-md text-xs transition-all">
-                             Calculate Nightfall Forecast
-                           </button>
-                           <button onClick={() => onCalculateDaylightFractionLayer(layer.id)} className="w-full bg-amber-600 hover:bg-amber-500 text-white font-semibold py-2 px-3 rounded-md text-xs transition-all">
-                             Calculate Daylight Fraction
-                           </button>
+                            <button onClick={() => onCalculateNightfallLayer(layer.id)} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-2 px-3 rounded-md text-xs transition-all">
+                                Calculate Nightfall Forecast
+                            </button>
+                            <button onClick={() => onCalculateDaylightFractionLayer(layer.id)} className="w-full bg-amber-600 hover:bg-amber-500 text-white font-semibold py-2 px-3 rounded-md text-xs transition-all">
+                                Calculate Daylight Fraction
+                            </button>
                         </div>
                     )}
                     {isNightfall && (
@@ -817,7 +819,7 @@ const LayerItem = React.memo<{ layer: Layer; isActive: boolean; onSelect: () => 
                                     max="1000"
                                     step="1"
                                     value={layer.params.clipValue}
-                                    onChange={(e) => onUpdateLayer(layer.id, { params: { ...layer.params, clipValue: Number(e.target.value) }})}
+                                    onChange={(e) => onUpdateLayer(layer.id, { params: { ...layer.params, clipValue: Number(e.target.value) } })}
                                     className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-purple-500 mt-1"
                                 />
                             </div>
@@ -885,7 +887,7 @@ const LayerItem = React.memo<{ layer: Layer; isActive: boolean; onSelect: () => 
 });
 
 const AddLayerMenu: React.FC = () => {
-    const { onAddDataLayer, onAddDteCommsLayer, onAddLpfCommsLayer, onAddIlluminationLayer, onAddBaseMapLayer, onAddImageLayer, isLoading } = useAppContext();
+    const { onAddDataLayer, onAddDteCommsLayer, onAddLpfCommsLayer, onAddIlluminationLayer, onAddBaseMapLayer, onAddImageLayer, isLoading } = useLayerContext();
     const [isOpen, setIsOpen] = useState(false);
     const npyInputRef = useRef<HTMLInputElement>(null);
     const dteInputRef = useRef<HTMLInputElement>(null);
@@ -943,43 +945,44 @@ const AddLayerMenu: React.FC = () => {
     }, []);
 
     return (
-      <div className="relative" ref={dropdownRef}>
-        <button onClick={() => setIsOpen(!isOpen)} disabled={!!isLoading} className="w-full bg-cyan-600 hover:bg-cyan-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold py-2 px-4 rounded-md text-xs transition-all flex items-center justify-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" /></svg>
-            Add Layer
-        </button>
-        {isOpen && (
-            <div className="absolute top-full mt-2 w-full bg-gray-800 rounded-md shadow-xl z-10 border border-gray-700 p-2 space-y-2">
-                <input ref={npyInputRef} type="file" accept=".npy" className="hidden" onChange={(e) => handleNpySelect(e, onAddDataLayer)} />
-                <button onClick={() => npyInputRef.current?.click()} className="w-full bg-gray-700 hover:bg-gray-600 text-white font-semibold py-1 px-3 rounded-md text-xs transition-all text-left">Data Layer (.npy)</button>
-                <input ref={dteInputRef} type="file" accept=".npy" className="hidden" onChange={(e) => handleNpySelect(e, onAddDteCommsLayer)} />
-                <button onClick={() => dteInputRef.current?.click()} className="w-full bg-gray-700 hover:bg-gray-600 text-white font-semibold py-1 px-3 rounded-md text-xs transition-all text-left">DTE Comms Layer (.npy)</button>
-                <input ref={lpfInputRef} type="file" accept=".npy" className="hidden" onChange={(e) => handleNpySelect(e, onAddLpfCommsLayer)} />
-                <button onClick={() => lpfInputRef.current?.click()} className="w-full bg-gray-700 hover:bg-gray-600 text-white font-semibold py-1 px-3 rounded-md text-xs transition-all text-left">LPF Comms Layer (.npy)</button>
-                <input ref={netcdfInputRef} type="file" accept=".nc,.nc4" className="hidden" onChange={(e) => handleNpySelect(e, onAddIlluminationLayer)} />
-                <button onClick={() => netcdfInputRef.current?.click()} className="w-full bg-gray-700 hover:bg-gray-600 text-white font-semibold py-1 px-3 rounded-md text-xs transition-all text-left">Illumination Layer (.nc)</button>
-                <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageSelect} />
-                <button onClick={() => imageInputRef.current?.click()} className="w-full bg-gray-700 hover:bg-gray-600 text-white font-semibold py-1 px-3 rounded-md text-xs transition-all text-left">Image Layer</button>
-                <div className="border-t border-gray-700 pt-2">
-                    <label className="block text-xs text-gray-400 mb-1">Base Map (PNG + VRT)</label>
-                    <input ref={pngInputRef} type="file" accept=".png" className="hidden" onChange={handlePngSelect} />
-                    <button onClick={() => pngInputRef.current?.click()} className="w-full bg-gray-700 hover:bg-gray-600 text-white font-semibold py-1 px-3 rounded-md text-xs transition-all text-left mb-1">
-                        {pendingPng ? `✓ ${pendingPng.name}` : 'Select PNG...'}
-                    </button>
-                    <input ref={vrtInputRef} type="file" accept=".vrt" className="hidden" onChange={handleVrtSelect} />
-                    <button onClick={() => vrtInputRef.current?.click()} className="w-full bg-gray-700 hover:bg-gray-600 text-white font-semibold py-1 px-3 rounded-md text-xs transition-all text-left mb-1">
-                        {pendingVrt ? `✓ ${pendingVrt.name}` : 'Select VRT...'}
-                    </button>
-                    <button onClick={handleAddBaseMap} disabled={!pendingPng || !pendingVrt} className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-600 text-white font-semibold py-1 px-3 rounded-md text-xs transition-all">Add Base Map</button>
+        <div className="relative" ref={dropdownRef}>
+            <button onClick={() => setIsOpen(!isOpen)} disabled={!!isLoading} className="w-full bg-cyan-600 hover:bg-cyan-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold py-2 px-4 rounded-md text-xs transition-all flex items-center justify-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" /></svg>
+                Add Layer
+            </button>
+            {isOpen && (
+                <div className="absolute top-full mt-2 w-full bg-gray-800 rounded-md shadow-xl z-10 border border-gray-700 p-2 space-y-2">
+                    <input ref={npyInputRef} type="file" accept=".npy" className="hidden" onChange={(e) => handleNpySelect(e, onAddDataLayer)} />
+                    <button onClick={() => npyInputRef.current?.click()} className="w-full bg-gray-700 hover:bg-gray-600 text-white font-semibold py-1 px-3 rounded-md text-xs transition-all text-left">Data Layer (.npy)</button>
+                    <input ref={dteInputRef} type="file" accept=".npy" className="hidden" onChange={(e) => handleNpySelect(e, onAddDteCommsLayer)} />
+                    <button onClick={() => dteInputRef.current?.click()} className="w-full bg-gray-700 hover:bg-gray-600 text-white font-semibold py-1 px-3 rounded-md text-xs transition-all text-left">DTE Comms Layer (.npy)</button>
+                    <input ref={lpfInputRef} type="file" accept=".npy" className="hidden" onChange={(e) => handleNpySelect(e, onAddLpfCommsLayer)} />
+                    <button onClick={() => lpfInputRef.current?.click()} className="w-full bg-gray-700 hover:bg-gray-600 text-white font-semibold py-1 px-3 rounded-md text-xs transition-all text-left">LPF Comms Layer (.npy)</button>
+                    <input ref={netcdfInputRef} type="file" accept=".nc,.nc4" className="hidden" onChange={(e) => handleNpySelect(e, onAddIlluminationLayer)} />
+                    <button onClick={() => netcdfInputRef.current?.click()} className="w-full bg-gray-700 hover:bg-gray-600 text-white font-semibold py-1 px-3 rounded-md text-xs transition-all text-left">Illumination Layer (.nc)</button>
+                    <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageSelect} />
+                    <button onClick={() => imageInputRef.current?.click()} className="w-full bg-gray-700 hover:bg-gray-600 text-white font-semibold py-1 px-3 rounded-md text-xs transition-all text-left">Image Layer</button>
+                    <div className="border-t border-gray-700 pt-2">
+                        <label className="block text-xs text-gray-400 mb-1">Base Map (PNG + VRT)</label>
+                        <input ref={pngInputRef} type="file" accept=".png" className="hidden" onChange={handlePngSelect} />
+                        <button onClick={() => pngInputRef.current?.click()} className="w-full bg-gray-700 hover:bg-gray-600 text-white font-semibold py-1 px-3 rounded-md text-xs transition-all text-left mb-1">
+                            {pendingPng ? `✓ ${pendingPng.name}` : 'Select PNG...'}
+                        </button>
+                        <input ref={vrtInputRef} type="file" accept=".vrt" className="hidden" onChange={handleVrtSelect} />
+                        <button onClick={() => vrtInputRef.current?.click()} className="w-full bg-gray-700 hover:bg-gray-600 text-white font-semibold py-1 px-3 rounded-md text-xs transition-all text-left mb-1">
+                            {pendingVrt ? `✓ ${pendingVrt.name}` : 'Select VRT...'}
+                        </button>
+                        <button onClick={handleAddBaseMap} disabled={!pendingPng || !pendingVrt} className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-600 text-white font-semibold py-1 px-3 rounded-md text-xs transition-all">Add Base Map</button>
+                    </div>
                 </div>
-            </div>
-        )}
-      </div>
+            )}
+        </div>
     );
 };
 
 const ExpressionEditor: React.FC = () => {
-    const { layers, onCreateExpressionLayer, setIsCreatingExpression, isLoading } = useAppContext();
+    const { layers, onCreateExpressionLayer, isLoading } = useLayerContext();
+    const { setIsCreatingExpression } = useUIStateContext();
     const [name, setName] = useState('Expression Layer');
     const [expression, setExpression] = useState('');
 
@@ -1056,11 +1059,11 @@ const ExpressionEditor: React.FC = () => {
                     Cancel
                 </button>
                 <button
-                  onClick={handleSubmit}
-                  disabled={!name.trim() || !expression.trim() || isComputing}
-                  className="bg-cyan-600 hover:bg-cyan-500 disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed text-white font-semibold py-1.5 px-3 rounded-md text-xs"
+                    onClick={handleSubmit}
+                    disabled={!name.trim() || !expression.trim() || isComputing}
+                    className="bg-cyan-600 hover:bg-cyan-500 disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed text-white font-semibold py-1.5 px-3 rounded-md text-xs"
                 >
-                  {isComputing ? 'Computing...' : 'Create'}
+                    {isComputing ? 'Computing...' : 'Create'}
                 </button>
             </div>
         </div>
@@ -1072,10 +1075,13 @@ export const LayersPanel: React.FC = () => {
         layers,
         activeLayerId,
         setActiveLayerId,
+        isLoading,
+    } = useLayerContext();
+
+    const {
         isCreatingExpression,
         setIsCreatingExpression,
-        isLoading,
-    } = useAppContext();
+    } = useUIStateContext();
 
     // Helper to check if there are layers with datasets
     const hasDataLayers = useMemo(() => {

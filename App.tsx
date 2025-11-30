@@ -7,32 +7,25 @@ import { TimeSlider } from './components/TimeSlider';
 import { TimeSeriesPlot } from './components/TimeSeriesPlot';
 import { ImportFilesModal } from './components/ImportFilesModal';
 import { UserManualModal } from './components/UserManualModal';
-import { useAppContext } from './context/AppContext';
+import { useLayerContext, useTimeContext, useUIStateContext, useArtifactContext } from './context';
 import { StatusBar } from './components/StatusBar';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ProgressOverlay } from './components/ProgressOverlay';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 
 const App: React.FC = () => {
+  const { primaryDataLayer, baseMapLayer, isLoading } = useLayerContext();
+  const { timeRange, onTogglePlay, handleManualTimeRangeChange } = useTimeContext();
   const {
-    importRequest,
-    handleRestoreSession,
-    setImportRequest,
     activeTool,
     onToolSelect,
-    primaryDataLayer,
-    baseMapLayer,
-    isLoading,
-    onTogglePlay,
-    handleManualTimeRangeChange,
-    timeRange,
+    importRequest,
+    setImportRequest,
     onImportConfig,
     onExportConfig,
-    canUndo,
-    canRedo,
-    onUndo,
-    onRedo
-  } = useAppContext();
+    handleRestoreSession
+  } = useUIStateContext();
+  const { canUndo, canRedo, onUndo, onRedo } = useArtifactContext();
 
   // User Manual modal state
   const [showUserManual, setShowUserManual] = useState(false);
@@ -127,9 +120,9 @@ const App: React.FC = () => {
         onRedo={onRedo}
         isDataLoaded={!!primaryDataLayer || !!baseMapLayer}
       />
-      
+
       <SidePanel />
-      
+
       <main className="flex-grow flex flex-col min-w-0">
         <section className="flex-grow flex items-center justify-center bg-black/20 p-4 sm:p-6 lg:p-8 relative">
           <ErrorBoundary
@@ -145,17 +138,17 @@ const App: React.FC = () => {
         </section>
 
         {primaryDataLayer && (
-            <>
-              <ErrorBoundary fallback={<div className="h-8 bg-gray-800"></div>}>
-                <StatusBar />
-              </ErrorBoundary>
-              <ErrorBoundary fallback={<div className="h-48 bg-gray-800"></div>}>
-                <TimeSeriesPlot />
-              </ErrorBoundary>
-              <ErrorBoundary fallback={<div className="h-20 bg-gray-800"></div>}>
-                <TimeSlider />
-              </ErrorBoundary>
-            </>
+          <>
+            <ErrorBoundary fallback={<div className="h-8 bg-gray-800"></div>}>
+              <StatusBar />
+            </ErrorBoundary>
+            <ErrorBoundary fallback={<div className="h-48 bg-gray-800"></div>}>
+              <TimeSeriesPlot />
+            </ErrorBoundary>
+            <ErrorBoundary fallback={<div className="h-20 bg-gray-800"></div>}>
+              <TimeSlider />
+            </ErrorBoundary>
+          </>
         )}
       </main>
     </div>

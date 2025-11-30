@@ -3,7 +3,14 @@ import React, { useRef, useEffect, useState, useMemo, useCallback } from 'react'
 import type { DataSlice, GeoCoordinates, ViewState, Layer, BaseMapLayer, DataLayer, AnalysisLayer, ImageLayer, TimeRange, Tool, Artifact, DteCommsLayer, LpfCommsLayer, Waypoint, PathArtifact, CircleArtifact, RectangleArtifact } from '../types';
 import { getColorScale } from '../services/colormap';
 import { ZoomControls } from './ZoomControls';
-import { useAppContext } from '../context/AppContext';
+
+import { useLayerContext } from '../context/LayerContext';
+import { useTimeContext } from '../context/TimeContext';
+import { useSelectionContext } from '../context/SelectionContext';
+import { useViewportContext } from '../context/ViewportContext';
+import { useUIStateContext } from '../context/UIStateContext';
+import { useArtifactContext } from '../context/ArtifactContext';
+
 import { OptimizedCanvasLRUCache } from '../utils/OptimizedLRUCache';
 import { isDataGridLayer, isNightfallLayer, isDaylightFractionLayer, getLayerTimeIndex, isIlluminationLayer } from '../utils/layerHelpers';
 import { useDebounce } from '../hooks/useDebounce';
@@ -245,22 +252,20 @@ const drawWaypointSymbol = (ctx: CanvasRenderingContext2D, symbol: string, x: nu
 
   ctx.restore();
 };
-
 export const DataCanvas: React.FC = () => {
-  const {
-    layers, timeRange, currentDateIndex, setHoveredCoords, setSelectedPixel, onFinishArtifactCreation, onUpdateArtifact,
-    clearHoverState, latRange, lonRange, showGraticule, graticuleDensity, graticuleLabelFontSize, proj, viewState,
-    setViewState, primaryDataLayer, baseMapLayer, showGrid, gridSpacing, gridColor, activeTool, selectedCells,
-    selectionColor, artifacts, artifactCreationMode, draggedInfo, setDraggedInfo, artifactDisplayOptions,
-    isAppendingWaypoints, coordinateTransformer, snapToCellCorner, calculateRectangleFromCellCorners,
-    setActiveArtifactId, setArtifacts, setSelectedCells, activeLayerId, onUpdateLayer, pathCreationOptions,
-    activityDefinitions, activeArtifactId, setSelectedCellForPlot, selectedCellForPlot, registerCanvasCacheCleaner
-  } = useAppContext();
+  // Context hooks
+  const { layers, primaryDataLayer, baseMapLayer, activeLayerId, isLoading, registerCanvasCacheCleaner, onUpdateLayer } = useLayerContext();
+  const { currentDateIndex, timeRange, isPlaying, setTimeRange, setCurrentDateIndex, setIsPlaying } = useTimeContext();
+  const { selectedPixel, setSelectedPixel, setHoveredCoords, selectedCellForPlot, setSelectedCellForPlot, selectedCells, setSelectedCells, selectionColor, setSelectionColor, setTimeSeriesData, setDaylightFractionHoverData, clearHoverState } = useSelectionContext();
+  const { viewState, proj, lonRange, latRange, setViewState, showGraticule, graticuleDensity, graticuleLabelFontSize, showGrid, gridSpacing, gridColor, coordinateTransformer, snapToCellCorner, calculateRectangleFromCellCorners } = useViewportContext();
+  const { activeTool, onToolSelect: setActiveTool } = useUIStateContext();
+  const { artifacts, activeArtifactId, artifactCreationMode, activityDefinitions, setArtifacts, setArtifactCreationMode, isAppendingWaypoints, setIsAppendingWaypoints, draggedInfo, setDraggedInfo, setActiveArtifactId, onUpdateArtifact, onFinishArtifactCreation, onStartAppendWaypoints, artifactDisplayOptions, pathCreationOptions } = useArtifactContext();
   const { showError } = useToast();
 
-  const timeIndex = currentDateIndex ?? 0;
-  const debouncedTimeRange = timeRange;
+  // Derived state
   const isDataLoaded = !!primaryDataLayer || !!baseMapLayer;
+  const debouncedTimeRange = timeRange;
+  const timeIndex = currentDateIndex ?? 0;
 
   // Helper function to create default activities for new waypoints
   const createDefaultActivities = useCallback(() => {
@@ -440,13 +445,6 @@ export const DataCanvas: React.FC = () => {
       const meridianLatMin = Math.max(-90, viewLatMin - latPadding);
       const meridianLatMax = Math.min(90, viewLatMax + latPadding);
 
-      console.log('Generating longitude lines:', {
-        lonStart, lonEnd, lonStep, lonPointCount,
-        viewLonMin, viewLonMax,
-        meridianLatMin, meridianLatMax,
-        viewLatMin, viewLatMax
-      });
-
       for (let lon = lonStart; lon <= lonEnd; lon += lonStep) {
         if (lon < -180 || lon > 180) continue;
 
@@ -467,19 +465,6 @@ export const DataCanvas: React.FC = () => {
 
         // Clip the line to viewport bounds to avoid extreme coordinates
         const clippedPoints = clipLineToViewport(allPoints);
-
-        // Log details for first longitude line
-        if (lon === lonStart) {
-          console.log(`First lon line (${lon}°):`, {
-            totalPoints: allPoints.length,
-            clippedPoints: clippedPoints.length,
-            firstPoint: allPoints[0],
-            lastPoint: allPoints[allPoints.length - 1],
-            firstClipped: clippedPoints[0],
-            lastClipped: clippedPoints[clippedPoints.length - 1],
-            viewportBounds
-          });
-        }
 
         // Only include lines that have clipped points
         if (clippedPoints.length >= 2) {
@@ -517,17 +502,6 @@ export const DataCanvas: React.FC = () => {
         }
       }
 
-      // Debug logging
-      console.log('Graticule cache updated:', {
-        lonLines: lonLines.length,
-        latLines: latLines.length,
-        lonStep,
-        latStep,
-        lonPointCount,
-        latPointCount,
-        viewBounds: { lonMin: viewLonMin, lonMax: viewLonMax, latMin: viewLatMin, latMax: viewLatMax }
-      });
-
       return { lonLines, latLines, lonStep, latStep };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -537,7 +511,6 @@ export const DataCanvas: React.FC = () => {
   }, [proj, combinedBounds, debouncedGraticuleDensity, showError]);
 
   const initialViewCalculated = useRef(false);
-
   const isPanning = useRef(false);
   const lastMousePos = useRef({ x: 0, y: 0 });
   const [initialViewState, setInitialViewState] = useState<ViewState | null>(null);
@@ -594,6 +567,148 @@ export const DataCanvas: React.FC = () => {
     }
   }, [artifactCreationMode]);
 
+  // Calculate Time Series Data
+  useEffect(() => {
+    // Prioritize selectedCellForPlot over selectedPixel (hover)
+    if (selectedCellForPlot) {
+      // Find the top visible data layer
+      const topDataLayer = [...layers].reverse().find(l =>
+        l.visible && (l.type === 'data' || l.type === 'analysis' || l.type === 'dte_comms' || l.type === 'lpf_comms' || l.type === 'illumination')
+      );
+      if (topDataLayer) {
+        // Check if selected cell coordinates are within bounds for this layer
+        // Note: casting to any to access dimensions/range/dataset which are common to data layers
+        const layer = topDataLayer as any;
+        if (selectedCellForPlot.y < layer.dimensions.height && selectedCellForPlot.x < layer.dimensions.width) {
+          // Check if layer uses lazy loading
+          if (layer.lazyDataset) {
+            // Async: load time series from lazy dataset
+            layer.lazyDataset.getPixelTimeSeries(selectedCellForPlot.y, selectedCellForPlot.x)
+              .then((series: number[]) => {
+                setTimeSeriesData({ data: series, range: layer.range });
+              })
+              .catch((err: any) => {
+                console.error('Failed to load pixel time series:', err);
+                setTimeSeriesData(null);
+              });
+          } else if (layer.dataset) {
+            // Traditional: extract from dataset array
+            const series = layer.dataset.map((slice: any) => slice?.[selectedCellForPlot.y]?.[selectedCellForPlot.x] ?? 0);
+            setTimeSeriesData({ data: series, range: layer.range });
+          }
+        } else {
+          setTimeSeriesData(null);
+        }
+      } else {
+        setTimeSeriesData(null);
+      }
+    } else if (selectedPixel) {
+      const layer = layers.find(l => l.id === selectedPixel.layerId) as any;
+      if (layer && (layer.type === 'data' || layer.type === 'analysis' || layer.type === 'dte_comms' || layer.type === 'lpf_comms' || layer.type === 'illumination')) {
+        // Check if selected pixel coordinates are within bounds for this layer
+        if (selectedPixel.y < layer.dimensions.height && selectedPixel.x < layer.dimensions.width) {
+          // Check if layer uses lazy loading
+          if (layer.lazyDataset) {
+            // Async: load time series from lazy dataset
+            layer.lazyDataset.getPixelTimeSeries(selectedPixel.y, selectedPixel.x)
+              .then((series: number[]) => {
+                setTimeSeriesData({ data: series, range: layer.range });
+              })
+              .catch((err: any) => {
+                console.error('Failed to load pixel time series:', err);
+                setTimeSeriesData(null);
+              });
+          } else if (layer.dataset) {
+            // Traditional: extract from dataset array
+            const series = layer.dataset.map((slice: any) => slice?.[selectedPixel.y]?.[selectedPixel.x] ?? 0);
+            setTimeSeriesData({ data: series, range: layer.range });
+          }
+        } else {
+          setTimeSeriesData(null);
+        }
+      } else {
+        setTimeSeriesData(null);
+      }
+    } else {
+      setTimeSeriesData(null);
+    }
+  }, [selectedPixel, selectedCellForPlot, layers, setTimeSeriesData]);
+
+  // Calculate Daylight Fraction Hover Data
+  useEffect(() => {
+    if (activeLayerId && selectedPixel && timeRange) {
+      const activeLayer = layers.find(l => l.id === activeLayerId);
+      if (activeLayer?.type === 'analysis' && activeLayer.analysisType === 'daylight_fraction') {
+        const sourceLayer = layers.find(l => l.id === activeLayer.sourceLayerId) as DataLayer | undefined;
+        if (sourceLayer) {
+          const { x, y } = selectedPixel;
+          // Check if coordinates are within bounds for source layer
+          if (y >= sourceLayer.dimensions.height || x >= sourceLayer.dimensions.width) {
+            setDaylightFractionHoverData(null);
+            return;
+          }
+
+          const { start, end } = timeRange;
+          const totalHours = end - start + 1;
+          let dayHours = 0;
+
+          let longestDay = 0, shortestDay = Infinity, dayPeriods = 0;
+          let longestNight = 0, shortestNight = Infinity, nightPeriods = 0;
+          let currentPeriodType: 'day' | 'night' | null = null;
+          let currentPeriodLength = 0;
+
+          for (let t = start; t <= end; t++) {
+            if (t >= sourceLayer.dataset.length || !sourceLayer.dataset[t]) continue;
+            const value = sourceLayer.dataset[t][y][x];
+            if (value === 1) dayHours++;
+
+            const currentType = value === 1 ? 'day' : 'night';
+            if (currentPeriodType !== currentType) {
+              if (currentPeriodType === 'day') {
+                dayPeriods++;
+                if (currentPeriodLength > longestDay) longestDay = currentPeriodLength;
+                if (currentPeriodLength < shortestDay) shortestDay = currentPeriodLength;
+              } else if (currentPeriodType === 'night') {
+                nightPeriods++;
+                if (currentPeriodLength > longestNight) longestNight = currentPeriodLength;
+                if (currentPeriodLength < shortestNight) shortestNight = currentPeriodLength;
+              }
+              currentPeriodType = currentType;
+              currentPeriodLength = 1;
+            } else {
+              currentPeriodLength++;
+            }
+          }
+
+          if (currentPeriodType === 'day') {
+            dayPeriods++;
+            if (currentPeriodLength > longestDay) longestDay = currentPeriodLength;
+            if (currentPeriodLength < shortestDay) shortestDay = currentPeriodLength;
+          } else if (currentPeriodType === 'night') {
+            nightPeriods++;
+            if (currentPeriodLength > longestNight) longestNight = currentPeriodLength;
+            if (currentPeriodLength < shortestNight) shortestNight = currentPeriodLength;
+          }
+
+          if (shortestDay === Infinity) shortestDay = 0;
+          if (shortestNight === Infinity) shortestNight = 0;
+
+          setDaylightFractionHoverData({
+            daylightPercentage: (dayHours / totalHours) * 100,
+            longestDay,
+            shortestDay,
+            longestNight,
+            shortestNight,
+          });
+        }
+      } else {
+        setDaylightFractionHoverData(null);
+      }
+    } else {
+      setDaylightFractionHoverData(null);
+    }
+  }, [activeLayerId, selectedPixel, timeRange, layers, setDaylightFractionHoverData]);
+
   useEffect(() => {
     const canvas = graticuleCanvasRef.current;
     if (!combinedBounds || !canvas || (viewState && initialViewCalculated.current)) return;
@@ -611,10 +726,6 @@ export const DataCanvas: React.FC = () => {
     setViewState(newInitialViewState);
     initialViewCalculated.current = true;
   }, [combinedBounds, setViewState, viewState]);
-
-  // Track layer IDs to detect when layers are added/removed (not just property changes)
-  const layerIds = useMemo(() => layers.map(l => l.id).join(','), [layers]);
-  useEffect(() => { initialViewCalculated.current = false; }, [layerIds]);
 
   // Register canvas cache cleaner with context on mount
   useEffect(() => {
@@ -789,7 +900,7 @@ export const DataCanvas: React.FC = () => {
   }, [viewState, layers, activeLayerId, showError]);
 
   // Attach wheel event listener with passive: false to allow preventDefault()
-  // Keep viewState ref updated for event handlers
+  // Keep viewStateRef updated for event handlers
   const viewStateRef = useRef(viewState);
   useEffect(() => { viewStateRef.current = viewState; }, [viewState]);
 
@@ -844,18 +955,18 @@ export const DataCanvas: React.FC = () => {
   }, [setViewState]); // Only re-run if setViewState changes (stable)
 
   useEffect(() => {
-    const canvases = [baseCanvasRef.current, dataCanvasRef.current, graticuleCanvasRef.current];
-    if (canvases.some(c => !c) || !viewState) return;
-    if (!isDataLoaded) return;
-
     setIsRendering(true);
     const renderStartTime = performance.now();
 
-    const [baseCanvas, dataCanvas, graticuleCanvas] = canvases as HTMLCanvasElement[];
-    const dpr = window.devicePixelRatio || 1;
+    const baseCanvas = baseCanvasRef.current;
+    const dataCanvas = dataCanvasRef.current;
+    const graticuleCanvas = graticuleCanvasRef.current;
 
+    if (!baseCanvas || !dataCanvas || !graticuleCanvas) return;
+
+    const dpr = window.devicePixelRatio || 1;
     [baseCanvas, dataCanvas, graticuleCanvas].forEach(canvas => {
-      if (!canvas.parentElement) return; // Guard against null parentElement
+      if (!canvas.parentElement) return;
       const { clientWidth, clientHeight } = canvas.parentElement;
       canvas.width = clientWidth * dpr; canvas.height = clientHeight * dpr;
     });
@@ -866,6 +977,7 @@ export const DataCanvas: React.FC = () => {
     if (!baseCtx || !dataCtx || !gratCtx) return; // Guard against null contexts
     const contexts = [baseCtx, dataCtx, gratCtx];
 
+    if (!viewState) return;
     const { center, scale } = viewState;
     contexts.forEach(ctx => {
       ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height); ctx.save();

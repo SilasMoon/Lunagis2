@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import type { Event } from '../../types';
-import { useAppContext } from '../../context/AppContext';
+import { useArtifactContext } from '../../context/ArtifactContext';
+import { useLayerContext } from '../../context/LayerContext';
+import { useTimeContext } from '../../context/TimeContext';
 import { Section } from './panelUtils';
 import { generateSecureId } from '../../utils/crypto';
 
@@ -23,13 +25,17 @@ export const EventsPanel: React.FC = () => {
         setActiveEventId,
         onAddEvent,
         onUpdateEvent,
-        onRemoveEvent,
-        primaryDataLayer,
+        onRemoveEvent
+    } = useArtifactContext();
+
+    const { primaryDataLayer } = useLayerContext();
+
+    const {
         currentDateIndex,
         setCurrentDateIndex,
         timeRange,
         getDateForIndex
-    } = useAppContext();
+    } = useTimeContext();
 
     const [newEventName, setNewEventName] = useState('');
     const [newEventDescription, setNewEventDescription] = useState('');
@@ -157,11 +163,10 @@ export const EventsPanel: React.FC = () => {
                         {[...events].sort((a, b) => a.dateIndex - b.dateIndex).map(event => (
                             <div
                                 key={event.id}
-                                className={`p-3 rounded-md border transition-all cursor-pointer ${
-                                    event.id === activeEventId
+                                className={`p-3 rounded-md border transition-all cursor-pointer ${event.id === activeEventId
                                         ? 'bg-orange-900/30 border-orange-500'
                                         : 'bg-gray-700/30 border-gray-600 hover:border-gray-500'
-                                }`}
+                                    }`}
                                 onClick={() => setActiveEventId(event.id === activeEventId ? null : event.id)}
                             >
                                 <div className="flex items-start justify-between gap-2">

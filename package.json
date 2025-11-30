@@ -25,6 +25,7 @@
     "d3-time-format": "^4.1.0",
     "h5wasm": "^0.8.8",
     "lucide-react": "^0.553.0",
+    "proj4": "^2.20.2",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },

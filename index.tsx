@@ -1,8 +1,7 @@
-// Fix: Removed invalid file header which was causing parsing errors.
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
-import { AppProvider } from './context/AppContext';
+import { AppProvider } from './context/AppProvider';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ToastProvider } from './components/Toast';
 

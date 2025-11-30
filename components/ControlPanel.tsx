@@ -3,7 +3,7 @@
  * Each panel has been extracted to separate files for better maintainability
  */
 import React from 'react';
-import { useAppContext } from '../context/AppContext';
+import { useUIStateContext } from '../context/UIStateContext';
 import { LayersPanel } from './panels/LayersPanel';
 import { ArtifactsPanel } from './panels/ArtifactsPanel';
 import { EventsPanel } from './panels/EventsPanel';
@@ -11,7 +11,7 @@ import { MeasurementPanel } from './panels/MeasurementPanel';
 import { ConfigurationPanel } from './panels/ConfigurationPanel';
 
 export const SidePanel: React.FC = () => {
-    const { activeTool } = useAppContext();
+    const { activeTool } = useUIStateContext();
     const renderPanel = () => {
         switch (activeTool) {
             case 'layers': return <LayersPanel />;

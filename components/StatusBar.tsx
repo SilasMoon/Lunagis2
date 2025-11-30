@@ -1,5 +1,9 @@
 import React from 'react';
-import { useAppContext } from '../context/AppContext';
+// NEW: Migrated to use modular contexts instead of monolithic AppContext
+import { useSelectionContext } from '../context/SelectionContext';
+import { useTimeContext } from '../context/TimeContext';
+import { useLayerContext } from '../context/LayerContext';
+import { useArtifactContext } from '../context/ArtifactContext';
 
 const InfoItem: React.FC<{ label: string; value: string | number; }> = ({ label, value }) => (
     <div className="flex items-center gap-2">
@@ -21,7 +25,11 @@ const formatDateToString = (date: Date): string => {
 };
 
 export const StatusBar: React.FC = () => {
-    const { hoveredCoords, timeRange, currentDateIndex, primaryDataLayer, timeSeriesData, artifactDisplayOptions, setArtifactDisplayOptions, getDateForIndex } = useAppContext();
+    // NEW: Use modular contexts
+    const { hoveredCoords, timeSeriesData } = useSelectionContext();
+    const { timeRange, currentDateIndex, getDateForIndex } = useTimeContext();
+    const { primaryDataLayer } = useLayerContext();
+    const { artifactDisplayOptions, setArtifactDisplayOptions } = useArtifactContext();
 
     if (!primaryDataLayer) {
         return null;
@@ -68,8 +76,8 @@ export const StatusBar: React.FC = () => {
             <button
                 onClick={toggleActivitySymbols}
                 className={`px-3 py-1 rounded text-xs font-medium transition-colors ${artifactDisplayOptions.showActivitySymbols
-                        ? 'bg-cyan-600 hover:bg-cyan-500 text-white'
-                        : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                    ? 'bg-cyan-600 hover:bg-cyan-500 text-white'
+                    : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
                     }`}
                 title={artifactDisplayOptions.showActivitySymbols ? 'Hide activity symbols' : 'Show activity symbols'}
             >

@@ -329,5 +329,5 @@ declare function proj4(fromProjection: string, toProjection?: string): proj4.Pro
 declare function proj4(fromProjection: string): proj4.ProjectionDefinition;
 
 // Make d3 and proj4 available globally
-declare const d3: typeof d3;
-declare const proj4: typeof proj4;
+// declare const d3: typeof d3;
+// declare const proj4: typeof proj4;

@@ -2,7 +2,7 @@
  * Custom hook for managing activity timeline logic
  * Extracts business logic from ActivityTimelineModal for better testability and reusability
  */
-import { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import type { Activity, ActivityTemplate, Waypoint, ActivityDefinition } from '../types';
 import { generateSecureId } from '../utils/crypto';
 
@@ -215,6 +215,7 @@ export function useActivityTimeline({ waypoint, activityDefinitions, showError }
     setShowSaveTemplateDialog,
     setTemplateName,
     setShowLoadConfirmation,
+    setTemplateToLoad,
 
     // Activity operations
     handleAddActivity,

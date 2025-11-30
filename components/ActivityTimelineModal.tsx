@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import type { Waypoint, Activity, ActivityDefinition } from '../types';
 import { ChevronUp, ChevronDown, Trash2, Plus, Save, FolderOpen } from 'lucide-react';
-import { useAppContext } from '../context/AppContext';
+import { useArtifactContext } from '../context/ArtifactContext';
 import { useToast } from './Toast';
 import { useActivityTimeline } from '../hooks/useActivityTimeline';
 
@@ -108,7 +108,7 @@ export const ActivityTimelineModal: React.FC<ActivityTimelineModalProps> = ({
   onClose,
   onSave,
 }) => {
-  const { activityDefinitions } = useAppContext();
+  const { activityDefinitions } = useArtifactContext();
   const { showError } = useToast();
 
   // Use custom hook for all business logic
@@ -141,6 +141,7 @@ export const ActivityTimelineModal: React.FC<ActivityTimelineModalProps> = ({
     confirmLoadTemplate,
     handleDeleteTemplate,
     validateAndGetUpdates,
+    setTemplateToLoad,
   } = useActivityTimeline({ waypoint, activityDefinitions, showError });
 
   const modalRef = useRef<HTMLDivElement>(null);
