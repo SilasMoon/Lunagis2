@@ -131,10 +131,7 @@ function packBinaryData(data: Int8Array | Uint8Array | Float32Array): Uint8Array
 }
 
 export class NetCDFLazyDataset implements ILazyDataset {
-  private file: H5File;
-  private filename: string;
-  private dataVarName: string;
-  private dataset: H5Dataset;
+  private latestRequestedTimeIndex: number = -1;
 
   constructor(file: H5File, filename: string, dataVarName: string) {
     this.file = file;
@@ -144,6 +141,8 @@ export class NetCDFLazyDataset implements ILazyDataset {
   }
 
   async getSlice(timeIndex: number): Promise<SliceData> {
+    this.latestRequestedTimeIndex = timeIndex;
+
     // Check cache first
     const cached = globalSliceCache.get(this.filename, timeIndex);
     if (cached) {
@@ -152,6 +151,12 @@ export class NetCDFLazyDataset implements ILazyDataset {
 
     // Yield before heavy lifting to let UI breathe
     await yieldToMain();
+
+    // STALENESS CHECK: If the user has requested a newer time index while we were waiting,
+    // abort this request to prevent blocking the main thread with obsolete work.
+    if (this.latestRequestedTimeIndex !== timeIndex) {
+      throw new Error('Request cancelled: stale time index');
+    }
 
     const [timeSteps, height, width] = this.dataset.shape;
     const start = [timeIndex, 0, 0];
