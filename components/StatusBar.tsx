@@ -44,7 +44,7 @@ export const StatusBar: React.FC = () => {
             <div className="flex items-center gap-x-4">
                 <InfoItem label="Lat" value={hoveredCoords ? hoveredCoords.lat.toFixed(4) : '---'} />
                 <InfoItem label="Lon" value={hoveredCoords ? hoveredCoords.lon.toFixed(4) : '---'} />
-                {currentValue !== null && (
+                {currentValue !== null && currentValue !== undefined && !isNaN(currentValue) && (
                     <InfoItem label="Value" value={currentValue.toFixed(2)} />
                 )}
             </div>
@@ -57,7 +57,7 @@ export const StatusBar: React.FC = () => {
                     <InfoItem label="Duration" value={`${timeRange.end - timeRange.start + 1} hrs`} />
                 </div>
             ) : (
-                 <div className="flex items-center gap-x-4">
+                <div className="flex items-center gap-x-4">
                     <InfoItem label="Current" value={'---'} />
                     <InfoItem label="Start" value={'---'} />
                     <InfoItem label="End" value={'---'} />
@@ -67,11 +67,10 @@ export const StatusBar: React.FC = () => {
 
             <button
                 onClick={toggleActivitySymbols}
-                className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
-                    artifactDisplayOptions.showActivitySymbols
+                className={`px-3 py-1 rounded text-xs font-medium transition-colors ${artifactDisplayOptions.showActivitySymbols
                         ? 'bg-cyan-600 hover:bg-cyan-500 text-white'
                         : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
-                }`}
+                    }`}
                 title={artifactDisplayOptions.showActivitySymbols ? 'Hide activity symbols' : 'Show activity symbols'}
             >
                 {artifactDisplayOptions.showActivitySymbols ? '👁️ Activities' : '👁️‍🗨️ Activities'}

@@ -952,8 +952,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!file) return;
     setIsLoading(`Parsing NetCDF4 file "${file.name}"...`);
 
+    // Step 1: Disable all other layers and flush their cache to free up memory
+    setLayers(currentLayers => {
+      currentLayers.forEach(l => {
+        if (l.visible && 'lazyDataset' in l && l.lazyDataset) {
+          console.log(`Disabling layer ${l.name} and clearing cache to free memory`);
+          l.lazyDataset.clearCache();
+        }
+      });
+      return currentLayers.map(l => ({ ...l, visible: false }));
+    });
+
+    // Allow UI to update
+    await new Promise(resolve => setTimeout(resolve, 100));
+
     try {
-      // Always use lazy loading for NetCDF files to prevent OOM
+      // Step 2: Always use lazy loading for NetCDF files to prevent OOM
       const arrayBuffer = await file.arrayBuffer();
       const { reader, shape, dimensions, metadata, coordinates } = await parseNetCdf4(arrayBuffer);
       const { time, height, width } = dimensions;
