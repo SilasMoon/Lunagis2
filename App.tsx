@@ -7,7 +7,7 @@ import { TimeSlider } from './components/TimeSlider';
 import { TimeSeriesPlot } from './components/TimeSeriesPlot';
 import { ImportFilesModal } from './components/ImportFilesModal';
 import { UserManualModal } from './components/UserManualModal';
-import { useLayerContext, useTimeContext, useUIStateContext, useArtifactContext } from './context';
+import { useLayerContext, useTimeContext, useUIStateContext, useArtifactContext, useSessionContext } from './context';
 import { StatusBar } from './components/StatusBar';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ProgressOverlay } from './components/ProgressOverlay';
@@ -21,10 +21,8 @@ const App: React.FC = () => {
     onToolSelect,
     importRequest,
     setImportRequest,
-    onImportConfig,
-    onExportConfig,
-    handleRestoreSession
   } = useUIStateContext();
+  const { onImportConfig, onExportConfig, handleRestoreSession } = useSessionContext();
   const { canUndo, canRedo, onUndo, onRedo } = useArtifactContext();
 
   // User Manual modal state

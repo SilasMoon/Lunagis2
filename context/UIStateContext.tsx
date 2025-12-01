@@ -8,12 +8,15 @@ interface UIStateContextType {
     flickeringLayerId: string | null;
     importRequest: { config: AppStateConfig; requiredFiles: string[]; } | null;
     isCreatingExpression: boolean;
+    activityDefinitions: Array<{ id: string; name: string; defaultDuration: number; }>;
 
     // Operations
     onToolSelect: (tool: Tool) => void;
     onToggleFlicker: (layerId: string) => void;
+    setActiveTool: React.Dispatch<React.SetStateAction<Tool | null>>;
     setImportRequest: React.Dispatch<React.SetStateAction<{ config: AppStateConfig; requiredFiles: string[]; } | null>>;
     setIsCreatingExpression: React.Dispatch<React.SetStateAction<boolean>>;
+    setActivityDefinitions: React.Dispatch<React.SetStateAction<Array<{ id: string; name: string; defaultDuration: number; }>>>;
     onExportConfig: () => Promise<void>;
     onImportConfig: (file: File) => void;
     handleRestoreSession: (config: AppStateConfig, files: FileList | File[]) => Promise<void>;
@@ -57,6 +60,17 @@ export const UIStateProvider: React.FC<UIStateProviderProps> = ({
     const [importRequest, setImportRequest] = useState<{ config: AppStateConfig; requiredFiles: string[]; } | null>(null);
     const [isCreatingExpression, setIsCreatingExpression] = useState(false);
     const [nightfallPlotYAxisRange, setNightfallPlotYAxisRange] = useState<{ min: number; max: number; }>({ min: 0, max: 100 });
+    const [activityDefinitions, setActivityDefinitions] = useState([
+        { id: 'DRIVE-0', name: 'Drive-0', defaultDuration: 60 },
+        { id: 'DRIVE-5', name: 'Drive-5', defaultDuration: 0 },
+        { id: 'DRIVE-10', name: 'Drive-10', defaultDuration: 60 },
+        { id: 'DRIVE-15', name: 'Drive-15', defaultDuration: 60 },
+        { id: 'DTE_COMMS', name: 'TTC_COMMS', defaultDuration: 3600 },
+        { id: 'LPF_COMMS', name: 'PL_COMMS', defaultDuration: 60 },
+        { id: 'IDLE', name: 'Idle', defaultDuration: 60 },
+        { id: 'SLEEP', name: 'Sleep', defaultDuration: 60 },
+        { id: 'SCIENCE', name: 'Science', defaultDuration: 60 },
+    ]);
 
     // Flicker animation state
     const flickerIntervalRef = useRef<number | null>(null);
@@ -157,12 +171,15 @@ export const UIStateProvider: React.FC<UIStateProviderProps> = ({
         flickeringLayerId,
         importRequest,
         isCreatingExpression,
+        activityDefinitions,
 
         // Operations
         onToolSelect,
         onToggleFlicker,
+        setActiveTool,
         setImportRequest,
         setIsCreatingExpression,
+        setActivityDefinitions,
         onExportConfig,
         onImportConfig,
         handleRestoreSession,

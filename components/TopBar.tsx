@@ -6,6 +6,7 @@ import logoUrl from '../utils/LunaGis_logo.svg?url';
 import { useUIStateContext } from '../context/UIStateContext';
 import { useArtifactContext } from '../context/ArtifactContext';
 import { useLayerContext } from '../context/LayerContext';
+import { useSessionContext } from '../context/SessionContext';
 
 interface ToolBarProps {
   onUserManualClick?: () => void;
@@ -97,7 +98,8 @@ const RedoIcon = () => (
 
 export const ToolBar: React.FC<ToolBarProps> = ({ onUserManualClick }) => {
   // NEW: Use modular contexts instead of props
-  const { activeTool, onToolSelect, onImportConfig, onExportConfig } = useUIStateContext();
+  const { activeTool, onToolSelect } = useUIStateContext();
+  const { onImportConfig, onExportConfig } = useSessionContext();
   const { canUndo, canRedo, onUndo, onRedo } = useArtifactContext();
   const { primaryDataLayer, baseMapLayer } = useLayerContext();
 
