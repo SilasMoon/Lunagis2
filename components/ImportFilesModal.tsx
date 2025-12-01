@@ -20,7 +20,7 @@ export const ImportFilesModal: React.FC<{
                     <input
                         type="file"
                         multiple
-                        accept=".npy,.png,.vrt"
+                        accept=".npy,.png,.vrt,.nc"
                         onChange={(e) => setSelectedFiles(e.target.files)}
                         className="w-full text-sm text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-cyan-600 file:text-white hover:file:bg-cyan-500"
                     />

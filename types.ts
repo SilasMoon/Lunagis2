@@ -429,7 +429,63 @@ export interface SerializableAnalysisLayer extends SerializableLayerBase {
   };
 }
 
-export type SerializableLayer = SerializableBaseMapLayer | SerializableDataLayer | SerializableAnalysisLayer | SerializableDteCommsLayer | SerializableLpfCommsLayer | SerializableImageLayer;
+export interface SerializableIlluminationLayer extends SerializableLayerBase {
+  type: 'illumination';
+  fileName: string;
+  range: { min: number; max: number };
+  colormap: ColorMapName;
+  colormapInverted?: boolean;
+  customColormap?: ColorStop[];
+  transparencyLowerThreshold?: number;
+  transparencyUpperThreshold?: number;
+  dimensions: { time: number; height: number; width: number };
+  metadata?: {
+    title?: string;
+    institution?: string;
+    source?: string;
+    conventions?: string;
+    variableName?: string;
+    timeUnit?: string;
+    timeValues?: number[];
+    crs?: {
+      projection: string;
+      latitudeOfOrigin?: number;
+      centralMeridian?: number;
+      semiMajorAxis?: number;
+      spatialRef?: string;
+    };
+  };
+  temporalInfo?: {
+    dates: Date[];
+    startDate: Date;
+    endDate: Date;
+  };
+  geospatial?: {
+    projectedBounds: {
+      xMin: number;
+      xMax: number;
+      yMin: number;
+      yMax: number;
+    };
+    geographicBounds: {
+      latMin: number;
+      latMax: number;
+      lonMin: number;
+      lonMax: number;
+    };
+    corners: {
+      topLeft: { lat: number; lon: number };
+      topRight: { lat: number; lon: number };
+      bottomLeft: { lat: number; lon: number };
+      bottomRight: { lat: number; lon: number };
+    };
+  };
+  debugFlipX?: boolean;
+  debugFlipY?: boolean;
+  illuminationThreshold?: number;
+}
+
+export type SerializableLayer = SerializableBaseMapLayer | SerializableDataLayer | SerializableAnalysisLayer | SerializableDteCommsLayer | SerializableLpfCommsLayer | SerializableImageLayer | SerializableIlluminationLayer;
 
 export interface AppStateConfig {
   version: number;

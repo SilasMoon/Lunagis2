@@ -12,6 +12,8 @@ import { useArtifactContext } from './ArtifactContext';
 import { useToast } from '../components/Toast';
 import { parseNpy } from '../services/npyParser';
 import { parseVrt } from '../services/vrtParser';
+import { parseNetCdf4, parseTimeValues } from '../services/netcdf4Parser';
+import proj4 from 'proj4';
 import * as analysisService from '../services/analysisService';
 import { IMAGE_LOAD_TIMEOUT_MS } from '../config/defaults';
 
@@ -101,6 +103,10 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
                     const imageDataUrl = canvas.toDataURL('image/png');
                     const { image, ...rest } = l;
                     return { ...rest, imageDataUrl };
+                } else if (l.type === 'illumination') {
+                    // Omit dataset and lazyDataset (which is not serializable)
+                    const { dataset, lazyDataset, ...rest } = l as any;
+                    return rest;
                 } else { // data, analysis, or comms
                     const { dataset, ...rest } = l; // Omit large dataset
                     return rest;
@@ -220,6 +226,37 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
                     const { imageDataUrl, ...rest } = sLayer;
                     const layer: ImageLayer = { ...rest, image };
                     newLayers.push(layer);
+                } else if (sLayer.type === 'illumination') {
+                    processedLayers++;
+                    const progress = Math.floor((processedLayers / totalNonAnalysisLayers) * 100);
+                    setIsLoading(`Loading layer ${processedLayers} of ${totalNonAnalysisLayers}... ${progress}%`);
+
+                    const file = fileMap.get(sLayer.fileName);
+                    if (!file) throw new Error(`Required file "${sLayer.fileName}" was not provided.`);
+
+                    const arrayBuffer = await file.arrayBuffer();
+                    const { reader } = await parseNetCdf4(arrayBuffer);
+
+                    // Parse dates in temporalInfo if they exist (JSON deserialization leaves them as strings)
+                    let temporalInfo = sLayer.temporalInfo;
+                    if (temporalInfo) {
+                        temporalInfo = {
+                            ...temporalInfo,
+                            startDate: new Date(temporalInfo.startDate),
+                            endDate: new Date(temporalInfo.endDate),
+                            dates: temporalInfo.dates.map((d: string | Date) => new Date(d))
+                        };
+                    }
+
+                    // We don't need to re-calculate metadata/geospatial info as it's in the serialized layer
+                    // But we do need the reader for lazy loading
+                    const layer: IlluminationLayer = {
+                        ...sLayer,
+                        dataset: [], // Empty dataset as it's lazy loaded
+                        lazyDataset: reader,
+                        temporalInfo
+                    };
+                    newLayers.push(layer);
                 }
             }
 
@@ -320,6 +357,8 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
                     } else if (l.type === 'basemap') {
                         requiredFiles.push(l.pngFileName);
                         requiredFiles.push(l.vrtFileName);
+                    } else if (l.type === 'illumination') {
+                        requiredFiles.push(l.fileName);
                     }
                     // Image layers don't need separate files - they're embedded as data URLs
                 }
