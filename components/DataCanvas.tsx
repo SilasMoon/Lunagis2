@@ -3,7 +3,7 @@ import React, { useRef, useEffect, useState, useMemo, useCallback } from 'react'
 import type { DataSlice, GeoCoordinates, ViewState, Layer, BaseMapLayer, DataLayer, AnalysisLayer, ImageLayer, TimeRange, Tool, Artifact, DteCommsLayer, LpfCommsLayer, Waypoint, PathArtifact, CircleArtifact, RectangleArtifact } from '../types';
 import { getColorScale } from '../services/colormap';
 import { ZoomControls } from './ZoomControls';
-
+import { canvasCache } from '../services/canvasCache';
 import { useLayerContext } from '../context/LayerContext';
 import { useTimeContext } from '../context/TimeContext';
 import { useSelectionContext } from '../context/SelectionContext';
@@ -731,9 +731,9 @@ export const DataCanvas: React.FC = () => {
   useEffect(() => {
     const cleaner = (layerId: string) => {
       // Remove all cache entries for the specified layer ID
-      const allKeys = offscreenCanvasCache.keys();
+      const allKeys = canvasCache.keys();
       const keysToDelete = allKeys.filter(key => key.startsWith(`${layerId}-`));
-      keysToDelete.forEach(key => offscreenCanvasCache.delete(key));
+      keysToDelete.forEach(key => canvasCache.delete(key));
       console.log(`🗑️ Cleared ${keysToDelete.length} canvas cache entries for layer: ${layerId}`);
     };
 
@@ -1057,7 +1057,7 @@ export const DataCanvas: React.FC = () => {
         }
         cacheKey = baseKey;
 
-        let offscreenCanvas = offscreenCanvasCache.get(cacheKey);
+        let offscreenCanvas = canvasCache.get(cacheKey);
 
         if (!offscreenCanvas) {
           // Handle lazy loading or traditional dataset
@@ -1073,7 +1073,7 @@ export const DataCanvas: React.FC = () => {
               // Slice not yet loaded - trigger async load
               layer.lazyDataset.getSlice(actualTimeIndex).then(() => {
                 // Data is now in cache, invalidate canvas cache to trigger re-render
-                offscreenCanvasCache.delete(cacheKey);
+                canvasCache.delete(cacheKey);
                 // Trigger re-render by updating data version
                 setDataVersion(v => v + 1);
               }).catch(err => {
@@ -1187,7 +1187,7 @@ export const DataCanvas: React.FC = () => {
           }
 
           offscreenCtx.putImageData(imageData, 0, 0);
-          offscreenCanvasCache.set(cacheKey, offscreenCanvas);
+          canvasCache.set(cacheKey, offscreenCanvas);
         }
 
         dataCtx.save(); dataCtx.globalAlpha = layer.opacity;
