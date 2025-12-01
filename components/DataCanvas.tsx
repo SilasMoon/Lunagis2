@@ -694,55 +694,7 @@ export const DataCanvas: React.FC = () => {
   const viewStateRef = useRef(viewState);
   useEffect(() => { viewStateRef.current = viewState; }, [viewState]);
 
-  // Attach wheel event listener with passive: false to allow preventDefault()
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
 
-    const handleWheel = (e: WheelEvent) => {
-      const currentViewState = viewStateRef.current;
-      if (!currentViewState) return;
-
-      // Check if the wheel event originated from inside a modal
-      const target = e.target as HTMLElement;
-      if (target && target.closest('[data-modal="true"]')) {
-        return; // Let the modal handle scrolling
-      }
-
-      // Prevent default scrolling behavior
-      e.preventDefault();
-
-      const rect = container.getBoundingClientRect();
-      const offsetX = e.clientX - rect.left;
-      const offsetY = e.clientY - rect.top;
-
-      // Inline canvasToProjCoords logic to avoid dependency
-      const canvas = graticuleCanvasRef.current;
-      if (!canvas || canvas.width === 0 || canvas.height === 0) return;
-
-      const dpr = window.devicePixelRatio || 1;
-      const { center, scale } = currentViewState;
-      const projX = (offsetX * dpr - canvas.width / 2) / (scale * dpr) + center[0];
-      const projY = -(offsetY * dpr - canvas.height / 2) / (scale * dpr) + center[1];
-      const mouseProjBefore = [projX, projY];
-
-      const zoomFactor = 1 - e.deltaY * 0.001;
-      const newScale = currentViewState.scale * zoomFactor;
-
-      const newCenter: [number, number] = [
-        mouseProjBefore[0] - ((offsetX) * dpr - container.offsetWidth * dpr / 2) / (newScale * dpr),
-        mouseProjBefore[1] + ((offsetY) * dpr - container.offsetHeight * dpr / 2) / (newScale * dpr)
-      ];
-      setViewState({ scale: newScale, center: newCenter });
-    };
-
-    // Register with passive: false to allow preventDefault()
-    container.addEventListener('wheel', handleWheel, { passive: false });
-
-    return () => {
-      container.removeEventListener('wheel', handleWheel);
-    };
-  }, [setViewState]); // Only re-run if setViewState changes (stable)
 
   useEffect(() => {
     setIsRendering(true);
@@ -2686,6 +2638,26 @@ export const DataCanvas: React.FC = () => {
     <div
       ref={containerRef}
       className="w-full h-full relative"
+      tabIndex={0}
+      onWheel={(e) => {
+        if (e.target instanceof HTMLElement && e.target.closest('[data-modal="true"]')) return;
+        const rect = e.currentTarget.getBoundingClientRect();
+        const offsetX = e.clientX - rect.left;
+        const offsetY = e.clientY - rect.top;
+        const canvas = graticuleCanvasRef.current;
+        if (!canvas || !viewState || canvas.width === 0 || canvas.height === 0) return;
+        const dpr = window.devicePixelRatio || 1;
+        const { center, scale } = viewState;
+        const projX = (offsetX * dpr - canvas.width / 2) / (scale * dpr) + center[0];
+        const projY = -(offsetY * dpr - canvas.height / 2) / (scale * dpr) + center[1];
+        const zoomFactor = 1 - e.deltaY * 0.001;
+        const newScale = scale * zoomFactor;
+        const newCenter: [number, number] = [
+          projX - (offsetX * dpr - rect.width * dpr / 2) / (newScale * dpr),
+          projY + (offsetY * dpr - rect.height * dpr / 2) / (newScale * dpr)
+        ];
+        setViewState({ scale: newScale, center: newCenter });
+      }}
       onMouseDown={handleMouseDown}
       onMouseMove={handleInteractionMove}
       onMouseUp={handleMouseUp}

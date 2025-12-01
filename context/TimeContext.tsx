@@ -114,14 +114,12 @@ export const TimeProvider: React.FC<TimeProviderProps> = ({
         return [indexToDate(0), indexToDate(primaryDataLayer.dimensions.time - 1)];
     }, [primaryDataLayer]);
 
-    // Auto-update timeZoomDomain when fullTimeDomain changes (when switching between layers)
+    // Initialize timeZoomDomain when fullTimeDomain first becomes available
     useEffect(() => {
-        if (fullTimeDomain && (!timeZoomDomain ||
-            timeZoomDomain[0].getTime() !== fullTimeDomain[0].getTime() ||
-            timeZoomDomain[1].getTime() !== fullTimeDomain[1].getTime())) {
+        if (fullTimeDomain && !timeZoomDomain) {
             setTimeZoomDomain(fullTimeDomain);
         }
-    }, [fullTimeDomain, timeZoomDomain]);
+    }, [fullTimeDomain]); // Removed timeZoomDomain from dependencies to prevent reset
 
     // Initialize currentDateIndex and timeRange when primaryDataLayer loads
     useEffect(() => {
@@ -203,10 +201,11 @@ export const TimeProvider: React.FC<TimeProviderProps> = ({
     // Zoom to selection (sets time zoom domain to current time range)
     const onZoomToSelection = useCallback(() => {
         if (timeRange) {
-            const [startDate, endDate] = timeRange;
-            setTimeZoomDomain([new Date(startDate), new Date(endDate)]);
+            const startDate = getDateForIndex(timeRange.start);
+            const endDate = getDateForIndex(timeRange.end);
+            setTimeZoomDomain([startDate, endDate]);
         }
-    }, [timeRange]);
+    }, [timeRange, getDateForIndex]);
 
     // Reset zoom (sets time zoom domain to full domain)
     const onResetZoom = useCallback(() => {
